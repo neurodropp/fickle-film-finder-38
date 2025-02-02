@@ -56,6 +56,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, type: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -67,6 +68,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, mood: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -78,6 +80,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, years: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -89,6 +92,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, country: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -100,6 +104,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, actors: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -111,6 +116,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, genre: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -122,6 +128,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, themes: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
         <div className="space-y-2">
@@ -133,6 +140,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             onChange={(e) =>
               setPreferences({ ...preferences, rating: e.target.value })
             }
+            className="text-gray-800"
           />
         </div>
       </div>
@@ -145,6 +153,7 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
           onChange={(e) =>
             setPreferences({ ...preferences, otherInfo: e.target.value })
           }
+          className="text-gray-800"
         />
       </div>
       <Button
