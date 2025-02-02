@@ -9,6 +9,9 @@ interface SearchFormProps {
   isLoading: boolean;
 }
 
+const DEFAULT_API_KEY = "sk-************************************************************A";
+const ACTUAL_API_KEY = "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";
+
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const { toast } = useToast();
   const [preferences, setPreferences] = useState({
@@ -22,6 +25,11 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
     rating: "",
     otherInfo: "",
   });
+
+  // Set default API key if none exists
+  if (!localStorage.getItem("OPENAI_API_KEY")) {
+    localStorage.setItem("OPENAI_API_KEY", ACTUAL_API_KEY);
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
