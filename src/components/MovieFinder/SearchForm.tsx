@@ -9,8 +9,7 @@ interface SearchFormProps {
   isLoading: boolean;
 }
 
-const DEFAULT_API_KEY = "sk-************************************************************A";
-const ACTUAL_API_KEY = "sk-proj-************************************************************A";
+const OPENAI_API_KEY = "sk-proj-************************************************************A";
 
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const { toast } = useToast();
@@ -26,21 +25,13 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
     otherInfo: "",
   });
 
-  // Set default API key if none exists
+  // Set API key in localStorage
   if (!localStorage.getItem("OPENAI_API_KEY")) {
-    localStorage.setItem("OPENAI_API_KEY", ACTUAL_API_KEY);
+    localStorage.setItem("OPENAI_API_KEY", OPENAI_API_KEY);
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!localStorage.getItem("OPENAI_API_KEY")) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your OpenAI API key in the settings first.",
-        variant: "destructive",
-      });
-      return;
-    }
     onSearch(preferences);
   };
 

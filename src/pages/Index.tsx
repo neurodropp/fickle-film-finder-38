@@ -5,7 +5,6 @@ import LoadingSpinner from "@/components/MovieFinder/LoadingSpinner";
 import { generateMovieRecommendations } from "@/lib/openai";
 import { searchMovies, type Movie } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 
 const ITEMS_PER_PAGE = 5;
@@ -13,7 +12,6 @@ const ITEMS_PER_PAGE = 5;
 const Index = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [visibleMovies, setVisibleMovies] = useState(ITEMS_PER_PAGE);
   const { toast } = useToast();
 
@@ -40,17 +38,6 @@ const Index = () => {
     setVisibleMovies(prev => prev + ITEMS_PER_PAGE);
   };
 
-  const handleApiKeySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const input = (e.target as HTMLFormElement).apiKey;
-    localStorage.setItem("OPENAI_API_KEY", input.value);
-    setShowApiKeyInput(false);
-    toast({
-      title: "Success",
-      description: "API key has been saved!",
-    });
-  };
-
   return (
     <div className="min-h-screen bg-moviefinder-background text-white p-8">
       <div className="max-w-7xl mx-auto">
@@ -62,39 +49,6 @@ const Index = () => {
             Find your perfect movie match based on your preferences
           </p>
         </div>
-
-        {!localStorage.getItem("OPENAI_API_KEY") && !showApiKeyInput && (
-          <div className="text-center mb-8">
-            <Button
-              onClick={() => setShowApiKeyInput(true)}
-              variant="outline"
-              className="bg-transparent border-moviefinder-gold text-moviefinder-gold hover:bg-moviefinder-gold hover:text-black"
-            >
-              Set OpenAI API Key
-            </Button>
-          </div>
-        )}
-
-        {showApiKeyInput && (
-          <form
-            onSubmit={handleApiKeySubmit}
-            className="max-w-md mx-auto mb-8 space-y-4"
-          >
-            <Input
-              name="apiKey"
-              type="password"
-              placeholder="Enter your OpenAI API key"
-              className="bg-transparent border-moviefinder-silver"
-              required
-            />
-            <Button
-              type="submit"
-              className="w-full bg-moviefinder-gold text-black hover:bg-moviefinder-silver"
-            >
-              Save API Key
-            </Button>
-          </form>
-        )}
 
         <SearchForm onSearch={handleSearch} isLoading={isLoading} />
 
