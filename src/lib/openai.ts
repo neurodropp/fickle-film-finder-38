@@ -9,18 +9,19 @@ export const generateMovieRecommendations = async (preferences: {
   rating: string;
   otherInfo: string;
 }) => {
-  const prompt = `Based on these preferences:
-    - Type: ${preferences.type}
-    - Mood: ${preferences.mood}
-    - Years: ${preferences.years}
-    - Country: ${preferences.country}
-    - Actors: ${preferences.actors}
-    - Genre: ${preferences.genre}
-    - Themes: ${preferences.themes}
-    - Rating: ${preferences.rating}
-    - Other Info: ${preferences.otherInfo}
-    
-    Suggest 5 movies or TV shows that match these criteria. Return only the titles separated by commas.`;
+  const prompt = `You are a movie expert. Based on these specific preferences, suggest exactly 5 movies or TV shows that STRICTLY match these criteria. Only suggest movies that actually exist:
+
+Type: ${preferences.type || 'Any'}
+Mood: ${preferences.mood || 'Any'}
+Years: ${preferences.years || 'Any'}
+Country: ${preferences.country || 'Any'}
+Actors: ${preferences.actors || 'Any'}
+Genre: ${preferences.genre || 'Any'}
+Themes: ${preferences.themes || 'Any'}
+Minimum Rating: ${preferences.rating || 'Any'}
+Additional Info: ${preferences.otherInfo || 'None'}
+
+Return ONLY the exact titles of 5 movies/shows that match ALL the specified criteria, separated by commas. Do not include any other text or explanations.`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

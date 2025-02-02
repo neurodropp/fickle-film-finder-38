@@ -17,6 +17,35 @@ export interface Movie {
   moods?: string[];
 }
 
+const fetchMovieDetails = async (movieId: number): Promise<any> => {
+  const [movieDetails, credits] = await Promise.all([
+    fetch(
+      `https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}`,
+      {
+        headers: {
+          Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
+          accept: 'application/json'
+        }
+      }
+    ).then(res => res.json()),
+    fetch(
+      `https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${TMDB_API_KEY}`,
+      {
+        headers: {
+          Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
+          accept: 'application/json'
+        }
+      }
+    ).then(res => res.json())
+  ]);
+
+  return {
+    production_countries: movieDetails.production_countries?.map((country: any) => country.name) || [],
+    genres: movieDetails.genres?.map((genre: any) => genre.name) || [],
+    cast: credits.cast?.slice(0, 5).map((actor: any) => actor.name) || []
+  };
+};
+
 export const searchMovies = async (query: string): Promise<Movie[]> => {
   const response = await fetch(
     `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`,
@@ -34,20 +63,27 @@ export const searchMovies = async (query: string): Promise<Movie[]> => {
   }
   
   const data = await response.json();
-  return data.results.map((movie: any) => ({
-    id: movie.id,
-    title: movie.title,
-    poster_path: movie.poster_path
-      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-      : "/placeholder.svg",
-    overview: movie.overview,
-    release_date: movie.release_date,
-    vote_average: movie.vote_average,
-    genres: [], // We'll fetch genres in a separate call if needed
-    media_type: "movie",
-    production_countries: [], // These would need to be fetched from a separate API call
-    cast: [], // These would need to be fetched from a separate API call
-    themes: [], // These would need to be populated based on analysis
-    moods: [], // These would need to be populated based on analysis
-  }));
+  const movies = await Promise.all(
+    data.results.map(async (movie: any) => {
+      const details = await fetchMovieDetails(movie.id);
+      return {
+        id: movie.id,
+        title: movie.title,
+        poster_path: movie.poster_path
+          ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+          : "/placeholder.svg",
+        overview: movie.overview,
+        release_date: movie.release_date,
+        vote_average: movie.vote_average,
+        genres: details.genres,
+        media_type: "movie",
+        production_countries: details.production_countries,
+        cast: details.cast,
+        themes: [], // These would need to be populated based on analysis
+        moods: [], // These would need to be populated based on analysis
+      };
+    })
+  );
+  
+  return movies;
 };
