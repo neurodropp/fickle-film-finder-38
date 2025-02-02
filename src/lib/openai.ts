@@ -23,20 +23,29 @@ Additional Info: ${preferences.otherInfo || 'None'}
 
 Return ONLY the exact titles of 5 movies/shows that match ALL the specified criteria, separated by commas. Do not include any other text or explanations.`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("OPENAI_API_KEY")}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    }),
-  });
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("OPENAI_API_KEY")}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+      }),
+    });
 
-  const data = await response.json();
-  const titles = data.choices[0].message.content.split(",").map((t: string) => t.trim());
-  return titles;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to fetch recommendations');
+    }
+
+    const data = await response.json();
+    const titles = data.choices[0].message.content.split(",").map((t: string) => t.trim());
+    return titles;
+  } catch (error) {
+    throw error;
+  }
 };
