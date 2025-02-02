@@ -10,7 +10,7 @@ interface SearchFormProps {
 }
 
 const DEFAULT_API_KEY = "sk-************************************************************A";
-const ACTUAL_API_KEY = "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";
+const ACTUAL_API_KEY = "sk-proj-************************************************************A";
 
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const { toast } = useToast();

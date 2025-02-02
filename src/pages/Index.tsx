@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 
+const ITEMS_PER_PAGE = 5;
+
 const Index = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [visibleMovies, setVisibleMovies] = useState(ITEMS_PER_PAGE);
   const { toast } = useToast();
 
   const handleSearch = async (preferences: any) => {
@@ -21,6 +24,7 @@ const Index = () => {
       const moviePromises = titles.map((title) => searchMovies(title));
       const movieResults = await Promise.all(moviePromises);
       setMovies(movieResults.map((results) => results[0]).filter(Boolean));
+      setVisibleMovies(ITEMS_PER_PAGE);
     } catch (error) {
       toast({
         title: "Error",
@@ -30,6 +34,10 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleShowMore = () => {
+    setVisibleMovies(prev => prev + ITEMS_PER_PAGE);
   };
 
   const handleApiKeySubmit = (e: React.FormEvent) => {
@@ -98,9 +106,19 @@ const Index = () => {
 
         {movies.length > 0 && !isLoading && (
           <div className="mt-12 space-y-6">
-            {movies.map((movie) => (
+            {movies.slice(0, visibleMovies).map((movie) => (
               <MovieCard key={movie.id} movie={movie} />
             ))}
+            {visibleMovies < movies.length && (
+              <div className="text-center mt-8">
+                <Button
+                  onClick={handleShowMore}
+                  className="bg-moviefinder-gold text-black hover:bg-moviefinder-silver"
+                >
+                  Show More
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
