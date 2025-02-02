@@ -10,6 +10,11 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   genres: string[];
+  media_type?: string;
+  production_countries?: string[];
+  cast?: string[];
+  themes?: string[];
+  moods?: string[];
 }
 
 export const searchMovies = async (query: string): Promise<Movie[]> => {
@@ -39,5 +44,10 @@ export const searchMovies = async (query: string): Promise<Movie[]> => {
     release_date: movie.release_date,
     vote_average: movie.vote_average,
     genres: [], // We'll fetch genres in a separate call if needed
+    media_type: "movie",
+    production_countries: [], // These would need to be fetched from a separate API call
+    cast: [], // These would need to be fetched from a separate API call
+    themes: [], // These would need to be populated based on analysis
+    moods: [], // These would need to be populated based on analysis
   }));
 };
