@@ -29,6 +29,10 @@ Return ONLY the exact titles of 5 movies/shows that match ALL the specified crit
       throw new Error("OpenAI API key not found");
     }
 
+    if (!apiKey.startsWith('sk-') || apiKey.startsWith('sk-proj-')) {
+      throw new Error("Invalid OpenAI API key format. The API key should start with 'sk-' but not 'sk-proj-'. Please provide a valid OpenAI API key.");
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
