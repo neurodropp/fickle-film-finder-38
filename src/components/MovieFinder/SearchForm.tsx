@@ -9,7 +9,7 @@ interface SearchFormProps {
   isLoading: boolean;
 }
 
-const OPENAI_API_KEY = "sk-************************************************************A";
+const OPENAI_API_KEY = "sk-proj-************************************************************A";
 
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const { toast } = useToast();
