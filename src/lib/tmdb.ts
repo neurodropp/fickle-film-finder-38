@@ -17,25 +17,53 @@ export interface Movie {
   moods?: string[];
 }
 
+// Helper function to add delay between requests
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to make API calls with retry logic
+const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      
+      if (response.status === 429) {
+        // Wait for 1 second before retrying (adjust as needed)
+        await delay(1000);
+        continue;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await delay(1000);
+    }
+  }
+  throw new Error('Max retries reached');
+};
+
 const fetchMovieDetails = async (movieId: number): Promise<any> => {
+  const options = {
+    headers: {
+      Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
+      accept: 'application/json'
+    }
+  };
+
+  // Add delay between requests
+  await delay(250);
+
   const [movieDetails, credits] = await Promise.all([
-    fetch(
+    fetchWithRetry(
       `https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}`,
-      {
-        headers: {
-          Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
-          accept: 'application/json'
-        }
-      }
+      options
     ).then(res => res.json()),
-    fetch(
+    fetchWithRetry(
       `https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${TMDB_API_KEY}`,
-      {
-        headers: {
-          Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
-          accept: 'application/json'
-        }
-      }
+      options
     ).then(res => res.json())
   ]);
 
@@ -47,26 +75,26 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
 };
 
 export const searchMovies = async (query: string): Promise<Movie[]> => {
-  const response = await fetch(
-    `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
-        accept: 'application/json'
-      }
+  const options = {
+    headers: {
+      Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
+      accept: 'application/json'
     }
+  };
+
+  const response = await fetchWithRetry(
+    `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`,
+    options
   );
   
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.status_message || 'Failed to fetch movies');
-  }
-  
   const data = await response.json();
-  const movies = await Promise.all(
-    data.results.map(async (movie: any) => {
+  
+  // Process movies sequentially to avoid overwhelming the API
+  const movies = [];
+  for (const movie of data.results) {
+    try {
       const details = await fetchMovieDetails(movie.id);
-      return {
+      movies.push({
         id: movie.id,
         title: movie.title,
         poster_path: movie.poster_path
@@ -81,9 +109,14 @@ export const searchMovies = async (query: string): Promise<Movie[]> => {
         cast: details.cast,
         themes: [], // These would need to be populated based on analysis
         moods: [], // These would need to be populated based on analysis
-      };
-    })
-  );
+      });
+      
+      if (movies.length === 1) break; // Only get the first matching movie for each title
+    } catch (error) {
+      console.error(`Error fetching details for movie ${movie.title}:`, error);
+      continue;
+    }
+  }
   
   return movies;
 };
