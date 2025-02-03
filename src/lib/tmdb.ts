@@ -1,6 +1,6 @@
 // Note: This is a public API key and Bearer token for demo purposes
-const TMDB_API_KEY = "1b5adf76a72a13bad99b8fc0c68cb085";
-const TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYjVhZGY3NmE3MmExM2JhZDk5YjhmYzBjNjhjYjA4NSIsInN1YiI6IjY1ZjZlODI2ZTAzOWYxMDE3Y2YyZmM2YiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.qrS1x1hydXFDwV9_Gk-dwV8ELJQXWiZwGy7dmn4H760";
+const TMDB_API_KEY = "817893c1d72568bfe2daa1d0e2c525a8";
+const TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MTc4OTNjMWQ3MjU2OGJmZTJkYWExZDBlMmM1MjVhOCIsIm5iZiI6MTczODUxMTQ3MC43MzEsInN1YiI6IjY3OWY5NDZlZjBmOWRiZGJhNjk1NmY0ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Tx-lmCd45D5Sg9INtqsWfGCmwBnFkCadpnWOHEOa760";
 
 export interface Movie {
   id: number;
