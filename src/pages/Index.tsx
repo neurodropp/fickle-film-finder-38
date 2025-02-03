@@ -66,7 +66,7 @@ const Index = () => {
               ))}
             </div>
             
-            {visibleMovies < movies.length && (
+            {movies.length > visibleMovies && (
               <div className="text-center mt-8 pb-8">
                 <Button
                   onClick={handleShowMore}
