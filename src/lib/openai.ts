@@ -11,7 +11,7 @@ export const generateMovieRecommendations = async (preferences: {
   rating: string;
   otherInfo: string;
 }) => {
-  const prompt = `You are a movie expert. Based on these specific preferences, suggest exactly 5 movies or TV shows that STRICTLY match these criteria. Only suggest movies that actually exist:
+  const prompt = `You are a movie expert. Based on these specific preferences, suggest exactly 20 movies or TV shows that STRICTLY match these criteria. Only suggest movies that actually exist:
 
 Type: ${preferences.type || 'Any'}
 Mood: ${preferences.mood || 'Any'}
@@ -23,7 +23,7 @@ Themes: ${preferences.themes || 'Any'}
 Minimum Rating: ${preferences.rating || 'Any'}
 Additional Info: ${preferences.otherInfo || 'None'}
 
-Return ONLY the exact titles of 5 movies/shows that match ALL the specified criteria, separated by commas. Do not include any other text or explanations.`;
+Return ONLY the exact titles of 20 movies/shows that match ALL the specified criteria, separated by commas. Do not include any other text or explanations.`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

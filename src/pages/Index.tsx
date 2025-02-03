@@ -22,7 +22,7 @@ const Index = () => {
       const moviePromises = titles.map((title) => searchMovies(title));
       const movieResults = await Promise.all(moviePromises);
       setMovies(movieResults.map((results) => results[0]).filter(Boolean));
-      setVisibleMovies(ITEMS_PER_PAGE);
+      setVisibleMovies(ITEMS_PER_PAGE); // Reset visible movies to initial 5
     } catch (error) {
       toast({
         title: "Error",
@@ -35,7 +35,7 @@ const Index = () => {
   };
 
   const handleShowMore = () => {
-    setVisibleMovies((prev) => prev + ITEMS_PER_PAGE);
+    setVisibleMovies((prev) => Math.min(prev + ITEMS_PER_PAGE, movies.length));
   };
 
   return (
