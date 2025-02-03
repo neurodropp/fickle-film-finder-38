@@ -35,7 +35,7 @@ const Index = () => {
   };
 
   const handleShowMore = () => {
-    setVisibleMovies(prev => prev + ITEMS_PER_PAGE);
+    setVisibleMovies((prev) => prev + ITEMS_PER_PAGE);
   };
 
   return (
@@ -59,17 +59,21 @@ const Index = () => {
         )}
 
         {movies.length > 0 && !isLoading && (
-          <div className="mt-12 space-y-6">
-            {movies.slice(0, visibleMovies).map((movie) => (
-              <MovieCard key={movie.id} movie={movie} />
-            ))}
+          <div className="mt-12">
+            <div className="space-y-6">
+              {movies.slice(0, visibleMovies).map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </div>
+            
             {visibleMovies < movies.length && (
-              <div className="text-center mt-8">
+              <div className="text-center mt-8 pb-8">
                 <Button
                   onClick={handleShowMore}
-                  className="bg-moviefinder-gold text-black hover:bg-moviefinder-silver"
+                  variant="outline"
+                  className="bg-moviefinder-gold text-black hover:bg-moviefinder-silver transition-colors duration-200"
                 >
-                  Show More
+                  Show More Movies
                 </Button>
               </div>
             )}
