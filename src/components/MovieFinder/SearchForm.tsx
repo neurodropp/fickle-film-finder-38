@@ -11,7 +11,6 @@ interface SearchFormProps {
 
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const { toast } = useToast();
-  const [apiKey, setApiKey] = useState(localStorage.getItem("OPENAI_API_KEY") || "");
   const [preferences, setPreferences] = useState({
     type: "",
     mood: "",
@@ -26,45 +25,11 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!apiKey.startsWith('sk-') || apiKey.startsWith('sk-proj-')) {
-      toast({
-        title: "Invalid API Key",
-        description: "Please enter a valid OpenAI API key. It should start with 'sk-' but not 'sk-proj-'.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    localStorage.setItem("OPENAI_API_KEY", apiKey);
     onSearch(preferences);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
-      <div className="space-y-2">
-        <Label htmlFor="apiKey">OpenAI API Key</Label>
-        <Input
-          id="apiKey"
-          type="password"
-          placeholder="Enter your OpenAI API key"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          className="text-gray-800"
-        />
-        <p className="text-xs text-gray-400">
-          Get your API key from{" "}
-          <a
-            href="https://platform.openai.com/account/api-keys"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300"
-          >
-            OpenAI's dashboard
-          </a>
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="type">Type</Label>

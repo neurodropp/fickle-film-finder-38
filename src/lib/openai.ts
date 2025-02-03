@@ -1,3 +1,5 @@
+const OPENAI_API_KEY = "sk-svcacct-XFS3uNgI_fYiLd-r3LsY_CuSGU9LVNk6snehVRqH-odYw8zGTVNWVpXmuX7gSxr9LT3BlbkFJsOB4ZCd8GZFb5sR7cmdfWs-d39Jsjff8wcqVxnHKOaPLXYE-k0FdRxr8A-vesajoQA";
+
 export const generateMovieRecommendations = async (preferences: {
   type: string;
   mood: string;
@@ -24,20 +26,11 @@ Additional Info: ${preferences.otherInfo || 'None'}
 Return ONLY the exact titles of 5 movies/shows that match ALL the specified criteria, separated by commas. Do not include any other text or explanations.`;
 
   try {
-    const apiKey = localStorage.getItem("OPENAI_API_KEY");
-    if (!apiKey) {
-      throw new Error("OpenAI API key not found");
-    }
-
-    if (!apiKey.startsWith('sk-') || apiKey.startsWith('sk-proj-')) {
-      throw new Error("Invalid OpenAI API key format. The API key should start with 'sk-' but not 'sk-proj-'. Please provide a valid OpenAI API key.");
-    }
-
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: "gpt-4",
