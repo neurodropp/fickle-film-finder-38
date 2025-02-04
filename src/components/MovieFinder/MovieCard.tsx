@@ -5,6 +5,11 @@ interface MovieCardProps {
 }
 
 const MovieCard = ({ movie }: MovieCardProps) => {
+  const getTMDBUrl = (movie: Movie) => {
+    const type = movie.media_type === 'tv' ? 'tv' : 'movie';
+    return `https://www.themoviedb.org/${type}/${movie.id}`;
+  };
+
   return (
     <div className="relative bg-moviefinder-card rounded-lg overflow-hidden mb-6 w-full">
       <div className="flex flex-col md:flex-row">
@@ -20,7 +25,14 @@ const MovieCard = ({ movie }: MovieCardProps) => {
         {/* Movie Information */}
         <div className="w-full md:w-3/4 p-6 space-y-4">
           <div className="flex justify-between items-start">
-            <h3 className="text-2xl font-bold text-moviefinder-gold">{movie.title}</h3>
+            <a 
+              href={getTMDBUrl(movie)} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-2xl font-bold text-moviefinder-gold hover:underline hover:text-moviefinder-silver transition-colors"
+            >
+              {movie.title}
+            </a>
             <span className="text-moviefinder-gold text-lg">★ {movie.vote_average.toFixed(1)}</span>
           </div>
 
