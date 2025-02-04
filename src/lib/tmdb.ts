@@ -16,29 +16,85 @@ export interface Movie {
   moods?: string[];
 }
 
+// Request queue implementation
+class RequestQueue {
+  private queue: (() => Promise<any>)[] = [];
+  private processing = false;
+  private activeConnections = 0;
+  private readonly MAX_CONNECTIONS = 20;
+  private readonly DELAY_BETWEEN_REQUESTS = 100; // 100ms between requests to stay well under the 50/sec limit
+
+  async add<T>(request: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await request();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.processQueue();
+    });
+  }
+
+  private async processQueue() {
+    if (this.processing || this.activeConnections >= this.MAX_CONNECTIONS) {
+      return;
+    }
+
+    this.processing = true;
+    while (this.queue.length > 0 && this.activeConnections < this.MAX_CONNECTIONS) {
+      const request = this.queue.shift();
+      if (request) {
+        this.activeConnections++;
+        try {
+          await request();
+        } catch (error) {
+          console.error('Request failed:', error);
+        } finally {
+          this.activeConnections--;
+          await delay(this.DELAY_BETWEEN_REQUESTS);
+        }
+      }
+    }
+    this.processing = false;
+
+    if (this.queue.length > 0) {
+      this.processQueue();
+    }
+  }
+}
+
+const requestQueue = new RequestQueue();
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url, options);
-      
-      if (response.status === 429) {
-        await delay(1000);
-        continue;
+  return requestQueue.add(async () => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const delayMs = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, i) * 1000;
+          await delay(delayMs);
+          continue;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return response;
+      } catch (error) {
+        if (i === retries - 1) throw error;
+        await delay(Math.pow(2, i) * 1000); // Exponential backoff
       }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return response;
-    } catch (error) {
-      if (i === retries - 1) throw error;
-      await delay(1000);
     }
-  }
-  throw new Error('Max retries reached');
+    throw new Error('Max retries reached');
+  });
 };
 
 const fetchMovieDetails = async (movieId: number): Promise<any> => {
@@ -49,8 +105,7 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
     }
   };
 
-  await delay(250);
-
+  // Combine movie details and credits into a single Promise.all to reduce concurrent connections
   const [movieDetails, credits] = await Promise.all([
     fetchWithRetry(
       `https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}`,
@@ -107,7 +162,11 @@ export const searchMovies = async (searchParams: {
     const data = await response.json();
     
     const movies = [];
-    for (const movie of data.results) {
+    // Limit to first 10 results to reduce API calls
+    const limitedResults = data.results.slice(0, 10);
+    
+    // Process movies sequentially to avoid overwhelming the API
+    for (const movie of limitedResults) {
       try {
         const details = await fetchMovieDetails(movie.id);
         movies.push({
@@ -126,8 +185,6 @@ export const searchMovies = async (searchParams: {
           themes: [], // Will be populated by OpenAI
           moods: [], // Will be populated by OpenAI
         });
-        
-        if (movies.length === 10) break; // Limit to 10 results
       } catch (error) {
         console.error(`Error fetching details for movie ${movie.title}:`, error);
         continue;

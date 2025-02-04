@@ -1,25 +1,48 @@
 import { Movie } from "@/lib/tmdb";
+import { useEffect, useState } from "react";
 
 interface MovieCardProps {
   movie: Movie;
 }
 
 const MovieCard = ({ movie }: MovieCardProps) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
   const getTMDBUrl = (movie: Movie) => {
     const type = movie.media_type === 'tv' ? 'tv' : 'movie';
     return `https://www.themoviedb.org/${type}/${movie.id}`;
   };
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = movie.poster_path;
+    img.onload = () => setImageLoaded(true);
+    img.onerror = () => setImageError(true);
+  }, [movie.poster_path]);
 
   return (
     <div className="relative bg-moviefinder-card rounded-lg overflow-hidden mb-6 w-full">
       <div className="flex flex-col md:flex-row">
         {/* Movie Poster */}
         <div className="w-full md:w-1/4">
-          <img
-            src={movie.poster_path}
-            alt={movie.title}
-            className="w-full h-auto object-contain"
-          />
+          {!imageLoaded && !imageError && (
+            <div className="w-full h-full bg-gray-200 animate-pulse aspect-[2/3]" />
+          )}
+          {!imageError ? (
+            <img
+              src={movie.poster_path}
+              alt={movie.title}
+              className={`w-full h-auto object-contain transition-opacity duration-300 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center aspect-[2/3]">
+              <span className="text-gray-500">Image not available</span>
+            </div>
+          )}
         </div>
 
         {/* Movie Information */}
