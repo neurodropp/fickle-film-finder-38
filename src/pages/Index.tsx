@@ -2,7 +2,7 @@ import { useState } from "react";
 import SearchForm from "@/components/MovieFinder/SearchForm";
 import MovieCard from "@/components/MovieFinder/MovieCard";
 import LoadingSpinner from "@/components/MovieFinder/LoadingSpinner";
-import { generateMovieRecommendations } from "@/lib/openai";
+import { analyzePreferences, enrichMovieData } from "@/lib/openai";
 import { searchMovies, type Movie } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -13,16 +13,40 @@ const Index = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [visibleMovies, setVisibleMovies] = useState(ITEMS_PER_PAGE);
+  const [excludedTitles, setExcludedTitles] = useState<string[]>([]);
+  const [lastPreferences, setLastPreferences] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleSearch = async (preferences: any) => {
+  const handleSearch = async (preferences: any, isNewSearch: boolean = true) => {
     setIsLoading(true);
     try {
-      const titles = await generateMovieRecommendations(preferences);
-      const moviePromises = titles.map((title) => searchMovies(title));
-      const movieResults = await Promise.all(moviePromises);
-      setMovies(movieResults.map((results) => results[0]).filter(Boolean));
+      if (isNewSearch) {
+        setExcludedTitles([]);
+        setLastPreferences(preferences);
+      }
+
+      // Step 1: Analyze preferences using OpenAI
+      const analysis = await analyzePreferences(preferences, excludedTitles);
+      console.log("OpenAI Analysis:", analysis);
+
+      // Step 2: Search TMDB with the analyzed parameters
+      const movieResults = await searchMovies(analysis.searchParameters);
+      
+      // Step 3: Enrich movie data with OpenAI
+      const enrichedMovies = await enrichMovieData(movieResults);
+      
+      // Update excluded titles for potential "Search Again"
+      const newExcludedTitles = enrichedMovies.map((movie: Movie) => movie.title);
+      setExcludedTitles(prev => [...prev, ...newExcludedTitles]);
+
+      setMovies(enrichedMovies);
       setVisibleMovies(ITEMS_PER_PAGE); // Reset visible movies to initial 5
+
+      // Show the AI's understanding of the search
+      toast({
+        title: "Search Understanding",
+        description: analysis.understanding,
+      });
     } catch (error) {
       toast({
         title: "Error",
@@ -38,6 +62,12 @@ const Index = () => {
     setVisibleMovies((prev) => Math.min(prev + ITEMS_PER_PAGE, movies.length));
   };
 
+  const handleSearchAgain = () => {
+    if (lastPreferences) {
+      handleSearch(lastPreferences, false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-moviefinder-background text-white p-8">
       <div className="max-w-7xl mx-auto">
@@ -50,7 +80,7 @@ const Index = () => {
           </p>
         </div>
 
-        <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+        <SearchForm onSearch={(prefs) => handleSearch(prefs, true)} isLoading={isLoading} />
 
         {isLoading && (
           <div className="mt-12">
@@ -66,8 +96,8 @@ const Index = () => {
               ))}
             </div>
             
-            {movies.length > visibleMovies && (
-              <div className="text-center mt-8 pb-8">
+            <div className="text-center mt-8 pb-8 space-x-4">
+              {movies.length > visibleMovies && (
                 <Button
                   onClick={handleShowMore}
                   variant="outline"
@@ -75,8 +105,16 @@ const Index = () => {
                 >
                   Show More Movies
                 </Button>
-              </div>
-            )}
+              )}
+              
+              <Button
+                onClick={handleSearchAgain}
+                variant="outline"
+                className="bg-moviefinder-silver text-black hover:bg-moviefinder-gold transition-colors duration-200"
+              >
+                Search Again (Exclude Current Results)
+              </Button>
+            </div>
           </div>
         )}
       </div>

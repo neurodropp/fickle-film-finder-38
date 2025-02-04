@@ -1,17 +1,29 @@
 const OPENAI_API_KEY = "sk-svcacct-XFS3uNgI_fYiLd-r3LsY_CuSGU9LVNk6snehVRqH-odYw8zGTVNWVpXmuX7gSxr9LT3BlbkFJsOB4ZCd8GZFb5sR7cmdfWs-d39Jsjff8wcqVxnHKOaPLXYE-k0FdRxr8A-vesajoQA";
 
-export const generateMovieRecommendations = async (preferences: {
-  type: string;
-  mood: string;
-  years: string;
-  country: string;
-  actors: string;
-  genre: string;
-  themes: string;
-  rating: string;
-  otherInfo: string;
-}) => {
-  const prompt = `You are a movie expert. Based on these specific preferences, suggest exactly 20 movies or TV shows that STRICTLY match these criteria. Only suggest movies that actually exist:
+interface SearchParameters {
+  query: string;
+  year?: string;
+  with_genres?: string;
+  with_cast?: string;
+  region?: string;
+  vote_average_gte?: string;
+}
+
+export const analyzePreferences = async (
+  preferences: {
+    type: string;
+    mood: string;
+    years: string;
+    country: string;
+    actors: string;
+    genre: string;
+    themes: string;
+    rating: string;
+    otherInfo: string;
+  },
+  excludedTitles: string[] = []
+) => {
+  const prompt = `As a movie expert, analyze these preferences and create optimal search parameters for TMDB API. Consider all aspects carefully:
 
 Type: ${preferences.type || 'Any'}
 Mood: ${preferences.mood || 'Any'}
@@ -23,7 +35,20 @@ Themes: ${preferences.themes || 'Any'}
 Minimum Rating: ${preferences.rating || 'Any'}
 Additional Info: ${preferences.otherInfo || 'None'}
 
-Return ONLY the exact titles of 20 movies/shows that match ALL the specified criteria, separated by commas. Do not include any other text or explanations.`;
+${excludedTitles.length > 0 ? 'Please exclude these titles: ' + excludedTitles.join(', ') : ''}
+
+Provide your response in this exact JSON format:
+{
+  "searchParameters": {
+    "query": "search query for TMDB",
+    "year": "year or year range if specified",
+    "with_genres": "comma-separated genre ids if specified",
+    "with_cast": "comma-separated cast names if specified",
+    "region": "country code if specified",
+    "vote_average_gte": "minimum rating if specified"
+  },
+  "understanding": "brief explanation of what the user is looking for"
+}`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -41,14 +66,46 @@ Return ONLY the exact titles of 20 movies/shows that match ALL the specified cri
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error?.message || 'Failed to fetch recommendations');
+      throw new Error(errorData.error?.message || 'Failed to analyze preferences');
     }
 
     const data = await response.json();
-    const titles = data.choices[0].message.content.split(",").map((t: string) => t.trim());
-    return titles;
+    return JSON.parse(data.choices[0].message.content);
   } catch (error: any) {
     console.error("OpenAI API Error:", error);
-    throw new Error(error.message || "Failed to generate recommendations");
+    throw new Error(error.message || "Failed to analyze preferences");
+  }
+};
+
+export const enrichMovieData = async (movies: any[]) => {
+  const prompt = `As a movie expert, analyze these movies and provide additional context for each one. Here are the movies:
+${JSON.stringify(movies)}
+
+For each movie, provide themes and moods that match it. Return the response as a JSON array with each movie containing additional 'themes' and 'moods' arrays.`;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to enrich movie data');
+    }
+
+    const data = await response.json();
+    return JSON.parse(data.choices[0].message.content);
+  } catch (error: any) {
+    console.error("OpenAI API Error:", error);
+    throw new Error(error.message || "Failed to enrich movie data");
   }
 };

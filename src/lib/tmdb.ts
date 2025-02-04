@@ -1,4 +1,3 @@
-// Note: This is a public API key and Bearer token for demo purposes
 const TMDB_API_KEY = "817893c1d72568bfe2daa1d0e2c525a8";
 const TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MTc4OTNjMWQ3MjU2OGJmZTJkYWExZDBlMmM1MjVhOCIsIm5iZiI6MTczODUxMTQ3MC43MzEsInN1YiI6IjY3OWY5NDZlZjBmOWRiZGJhNjk1NmY0ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Tx-lmCd45D5Sg9INtqsWfGCmwBnFkCadpnWOHEOa760";
 
@@ -74,7 +73,14 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
   };
 };
 
-export const searchMovies = async (query: string): Promise<Movie[]> => {
+export const searchMovies = async (searchParams: {
+  query: string;
+  year?: string;
+  with_genres?: string;
+  with_cast?: string;
+  region?: string;
+  vote_average_gte?: string;
+}): Promise<Movie[]> => {
   const options = {
     headers: {
       Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
@@ -82,8 +88,19 @@ export const searchMovies = async (query: string): Promise<Movie[]> => {
     }
   };
 
+  let queryParams = new URLSearchParams({
+    api_key: TMDB_API_KEY,
+    query: searchParams.query,
+  });
+
+  if (searchParams.year) queryParams.append('year', searchParams.year);
+  if (searchParams.with_genres) queryParams.append('with_genres', searchParams.with_genres);
+  if (searchParams.with_cast) queryParams.append('with_cast', searchParams.with_cast);
+  if (searchParams.region) queryParams.append('region', searchParams.region);
+  if (searchParams.vote_average_gte) queryParams.append('vote_average.gte', searchParams.vote_average_gte);
+
   const response = await fetchWithRetry(
-    `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`,
+    `https://api.themoviedb.org/3/search/movie?${queryParams.toString()}`,
     options
   );
   
@@ -107,11 +124,11 @@ export const searchMovies = async (query: string): Promise<Movie[]> => {
         media_type: "movie",
         production_countries: details.production_countries,
         cast: details.cast,
-        themes: [], // These would need to be populated based on analysis
-        moods: [], // These would need to be populated based on analysis
+        themes: [], // Will be populated by OpenAI
+        moods: [], // Will be populated by OpenAI
       });
       
-      if (movies.length === 1) break; // Only get the first matching movie for each title
+      if (movies.length === 10) break; // Limit to 10 results
     } catch (error) {
       console.error(`Error fetching details for movie ${movie.title}:`, error);
       continue;
@@ -120,3 +137,5 @@ export const searchMovies = async (query: string): Promise<Movie[]> => {
   
   return movies;
 };
+
+// Helper functions can be added here if needed
