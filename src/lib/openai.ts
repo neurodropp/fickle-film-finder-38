@@ -78,10 +78,20 @@ Provide your response in this exact JSON format:
 };
 
 export const enrichMovieData = async (movies: any[]) => {
-  const prompt = `As a movie expert, analyze these movies and provide additional context for each one. Here are the movies:
-${JSON.stringify(movies)}
+  const prompt = `Analyze these movies and provide additional context. For each movie, provide themes and moods that match it. 
+Return ONLY a JSON array where each object has the movie's original data plus 'themes' and 'moods' arrays.
+Here are the movies to analyze: ${JSON.stringify(movies)}
 
-For each movie, provide themes and moods that match it. Return the response as a JSON array with each movie containing additional 'themes' and 'moods' arrays.`;
+Example of expected response format:
+[
+  {
+    "id": "original_id",
+    "title": "original_title",
+    ...rest of original movie data...,
+    "themes": ["theme1", "theme2"],
+    "moods": ["mood1", "mood2"]
+  }
+]`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -103,9 +113,21 @@ For each movie, provide themes and moods that match it. Return the response as a
     }
 
     const data = await response.json();
-    return JSON.parse(data.choices[0].message.content);
+    const enrichedData = JSON.parse(data.choices[0].message.content);
+    
+    // Ensure we maintain the original movie data structure
+    return movies.map((movie, index) => ({
+      ...movie,
+      themes: enrichedData[index]?.themes || [],
+      moods: enrichedData[index]?.moods || []
+    }));
   } catch (error: any) {
     console.error("OpenAI API Error:", error);
-    throw new Error(error.message || "Failed to enrich movie data");
+    // Return original movies if enrichment fails
+    return movies.map(movie => ({
+      ...movie,
+      themes: [],
+      moods: []
+    }));
   }
 };

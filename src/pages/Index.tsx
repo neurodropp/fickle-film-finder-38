@@ -29,9 +29,25 @@ const Index = () => {
       const analysis = await analyzePreferences(preferences, excludedTitles);
       console.log("OpenAI Analysis:", analysis);
 
+      // Show the AI's understanding of the search
+      toast({
+        title: "Search Understanding",
+        description: analysis.understanding,
+      });
+
       // Step 2: Search TMDB with the analyzed parameters
       const movieResults = await searchMovies(analysis.searchParameters);
       
+      if (movieResults.length === 0) {
+        toast({
+          title: "No Results",
+          description: "No movies found matching your preferences. Try adjusting your search criteria.",
+          variant: "destructive",
+        });
+        setMovies([]);
+        return;
+      }
+
       // Step 3: Enrich movie data with OpenAI
       const enrichedMovies = await enrichMovieData(movieResults);
       
@@ -40,19 +56,16 @@ const Index = () => {
       setExcludedTitles(prev => [...prev, ...newExcludedTitles]);
 
       setMovies(enrichedMovies);
-      setVisibleMovies(ITEMS_PER_PAGE); // Reset visible movies to initial 5
+      setVisibleMovies(ITEMS_PER_PAGE);
 
-      // Show the AI's understanding of the search
-      toast({
-        title: "Search Understanding",
-        description: analysis.understanding,
-      });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Search error:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch movie recommendations. Please try again.",
+        description: error.message || "Failed to fetch movie recommendations. Please try again.",
         variant: "destructive",
       });
+      setMovies([]);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +110,7 @@ const Index = () => {
             </div>
             
             <div className="text-center mt-8 pb-8 space-x-4">
-              {movies.length > visibleMovies && (
+              {visibleMovies < movies.length && (
                 <Button
                   onClick={handleShowMore}
                   variant="outline"
