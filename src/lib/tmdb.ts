@@ -1,5 +1,7 @@
+
 const TMDB_API_KEY = "817893c1d72568bfe2daa1d0e2c525a8";
 const TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MTc4OTNjMWQ3MjU2OGJmZTJkYWExZDBlMmM1MjVhOCIsIm5iZiI6MTczODUxMTQ3MC43MzEsInN1YiI6IjY3OWY5NDZlZjBmOWRiZGJhNjk1NmY0ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Tx-lmCd45D5Sg9INtqsWfGCmwBnFkCadpnWOHEOa760";
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
 export interface Movie {
   id: number;
@@ -22,7 +24,7 @@ class RequestQueue {
   private processing = false;
   private activeConnections = 0;
   private readonly MAX_CONNECTIONS = 20;
-  private readonly DELAY_BETWEEN_REQUESTS = 100; // 100ms between requests to stay well under the 50/sec limit
+  private readonly DELAY_BETWEEN_REQUESTS = 100;
 
   async add<T>(request: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -90,7 +92,7 @@ const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): P
         return response;
       } catch (error) {
         if (i === retries - 1) throw error;
-        await delay(Math.pow(2, i) * 1000); // Exponential backoff
+        await delay(Math.pow(2, i) * 1000);
       }
     }
     throw new Error('Max retries reached');
@@ -105,14 +107,14 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
     }
   };
 
-  // Combine movie details and credits into a single Promise.all to reduce concurrent connections
+  // Use TMDB_BASE_URL constant for constructing URLs
   const [movieDetails, credits] = await Promise.all([
     fetchWithRetry(
-      `https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}`,
+      `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}`,
       options
     ).then(res => res.json()),
     fetchWithRetry(
-      `https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${TMDB_API_KEY}`,
+      `${TMDB_BASE_URL}/movie/${movieId}/credits?api_key=${TMDB_API_KEY}`,
       options
     ).then(res => res.json())
   ]);
@@ -154,8 +156,9 @@ export const searchMovies = async (searchParams: {
   if (searchParams.vote_average_gte) queryParams.append('vote_average.gte', searchParams.vote_average_gte);
 
   try {
+    // Use TMDB_BASE_URL constant for constructing URLs
     const response = await fetchWithRetry(
-      `https://api.themoviedb.org/3/search/movie?${queryParams.toString()}`,
+      `${TMDB_BASE_URL}/search/movie?${queryParams.toString()}`,
       options
     );
     
