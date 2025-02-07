@@ -28,7 +28,7 @@ export const analyzePreferences = async (
   },
   excludedTitles: string[] = []
 ) => {
-  const prompt = `As a movie expert, analyze these preferences and create optimal search parameters for TMDB API. Note that unspecified parameters (empty or "Any") should NOT restrict the search - they indicate the user is flexible about that aspect.
+  const prompt = `As a movie expert, analyze these preferences and create optimal search parameters for TMDB API. Generate diverse, culturally-aware search queries that capture the essence of the preferences without being overly literal.
 
 User Preferences:
 Type: ${preferences.type || 'Any'}
@@ -44,38 +44,55 @@ Additional Info: ${preferences.otherInfo || 'None'}
 ${excludedTitles.length > 0 ? 'Please exclude these titles: ' + excludedTitles.join(', ') : ''}
 
 Instructions:
-1. Create TWO search queries if a country is specified:
-   - One focusing on movies produced in that country
-   - Another focusing on movies in that country's language
-2. For mood and themes, incorporate them into the query text rather than specific parameters
+1. For each country, create MULTIPLE search variations that consider:
+   - Cultural-specific terms (e.g., "commedia all'italiana" for Italian comedy)
+   - Popular genres in that country
+   - Famous directors or movements from that country
+   - Both production country AND language
+2. For mood searches:
+   - Transform moods into relevant genre combinations
+   - Include cultural interpretations of the mood
+   - Consider regional variations in genre expectations
 3. Set appropriate vote count thresholds:
+   - For non-English content: minimum 50 votes
    - For specific searches (3+ parameters): minimum 100 votes
    - For broader searches (1-2 parameters): minimum 500 votes
-4. When country is specified:
-   - Use both region (e.g., "IT" for Italy) AND with_original_language (e.g., "it" for Italian)
-   - Consider movies that match EITHER criterion as valid
-5. For unspecified preferences, omit those parameters entirely
-6. Create natural language queries that capture the essence of specified preferences
+4. Generate culturally relevant search terms:
+   - Map moods to cultural-specific concepts
+   - Include regional film movements or styles
+   - Consider local genre preferences
+5. Create multiple search variations:
+   - Combine different genre pairs
+   - Mix cultural terms with international ones
+   - Include both broad and specific searches
+
+Genre ID Reference:
+- Comedy: 35
+- Drama: 18
+- Romance: 10749
+- Family: 10751
+- Documentary: 99
+- Adventure: 12
+- Animation: 16
 
 Provide your response in this JSON format:
 {
   "searchParameters": [{
-    "query": "primary search query",
+    "query": "search query with cultural context",
     "region": "country code if specified",
     "with_original_language": "language code if specified",
+    "with_genres": "relevant genre IDs",
+    "vote_count_gte": "adjusted threshold",
     // other relevant parameters
-  },
-  {
-    "query": "alternative language/region search if country specified",
-    // alternative parameters
   }],
   "understanding": "brief explanation of search approach",
   "searchContext": {
     "moodKeywords": ["relevant", "mood", "keywords"],
-    "themeKeywords": ["relevant", "theme", "keywords"],
+    "genreContext": ["relevant", "genres"],
     "countryContext": {
       "region": "region code if specified",
-      "language": "language code if specified"
+      "language": "language code if specified",
+      "culturalKeywords": ["culturally specific terms"]
     },
     "specifiedParameterCount": number
   }
@@ -101,7 +118,9 @@ Provide your response in this JSON format:
     }
 
     const data = await response.json();
-    return JSON.parse(data.choices[0].message.content);
+    const analysis = JSON.parse(data.choices[0].message.content);
+    console.log("OpenAI Analysis:", analysis);
+    return analysis;
   } catch (error: any) {
     console.error("OpenAI API Error:", error);
     throw new Error(error.message || "Failed to analyze preferences");
