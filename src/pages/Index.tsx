@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import SearchForm from "@/components/MovieFinder/SearchForm";
 import MovieCard from "@/components/MovieFinder/MovieCard";
@@ -49,7 +50,7 @@ const Index = () => {
       }
 
       // Step 3: Enrich movie data with OpenAI
-      const enrichedMovies = await enrichMovieData(movieResults);
+      const enrichedMovies = await enrichMovieData(movieResults, preferences);
       
       // Update excluded titles for potential "Search Again"
       const newExcludedTitles = enrichedMovies.map((movie: Movie) => movie.title);
