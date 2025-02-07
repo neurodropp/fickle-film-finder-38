@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 
 const ITEMS_PER_PAGE = 5;
-const MINIMUM_CONFIDENCE_SCORE = 70; // Only show movies with confidence score >= 70
 
 const Index = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -53,13 +52,7 @@ const Index = () => {
       // Step 3: Enrich movie data with OpenAI
       const enrichedMovies = await enrichMovieData(movieResults, preferences);
       
-      // Filter movies based on confidence score and match criteria
-      const filteredMovies = enrichedMovies.filter(movie => 
-        movie.matchAnalysis && 
-        movie.matchAnalysis.confidenceScore >= MINIMUM_CONFIDENCE_SCORE
-      );
-
-      if (filteredMovies.length === 0) {
+      if (enrichedMovies.length === 0) {
         toast({
           title: "No Strong Matches",
           description: "We found some movies, but none matched your criteria closely enough. Try broadening your search.",
@@ -68,19 +61,28 @@ const Index = () => {
         setMovies([]);
         return;
       } else {
-        // Show match quality toast
+        // Count specified parameters
+        const specifiedParams = Object.entries(preferences)
+          .filter(([_, value]) => value && value.toString().trim() !== '')
+          .length;
+        
+        // Show match quality toast with context about search breadth
+        const matchDescription = specifiedParams <= 3 
+          ? `Found ${enrichedMovies.length} movies matching your broad criteria.`
+          : `Found ${enrichedMovies.length} movies that closely match your specific preferences.`;
+        
         toast({
           title: "Matches Found",
-          description: `Found ${filteredMovies.length} movies that closely match your preferences.`,
+          description: matchDescription,
         });
       }
       
       // Update excluded titles for potential "Search Again"
-      const newExcludedTitles = filteredMovies.map((movie: Movie) => movie.title);
+      const newExcludedTitles = enrichedMovies.map((movie: Movie) => movie.title);
       setExcludedTitles(prev => [...prev, ...newExcludedTitles]);
 
       // Sort movies by confidence score
-      const sortedMovies = [...filteredMovies].sort((a, b) => 
+      const sortedMovies = [...enrichedMovies].sort((a, b) => 
         (b.matchAnalysis?.confidenceScore || 0) - (a.matchAnalysis?.confidenceScore || 0)
       );
 

@@ -29,7 +29,10 @@ export const analyzePreferences = async (
   },
   excludedTitles: string[] = []
 ) => {
-  const prompt = `As a movie expert, analyze these preferences and create optimal search parameters for TMDB API. Consider ALL aspects carefully to create the most effective search:
+  // Count specified parameters
+  const specifiedParams = Object.entries(preferences).filter(([_, value]) => value.trim() !== '').length;
+
+  const prompt = `As a movie expert, analyze these preferences and create optimal search parameters for TMDB API. Note that unspecified parameters (empty or "Any") should NOT restrict the search - they indicate the user is flexible about that aspect.
 
 User Preferences:
 Type: ${preferences.type || 'Any'}
@@ -45,33 +48,27 @@ Additional Info: ${preferences.otherInfo || 'None'}
 ${excludedTitles.length > 0 ? 'Please exclude these titles: ' + excludedTitles.join(', ') : ''}
 
 Instructions:
-1. Analyze the mood and themes to construct a relevant search query
-2. Consider the type of content (movie/series) in the query
-3. Extract any potential crew members or companies from Additional Info
-4. Map countries to ISO region codes
-5. Convert genres to appropriate TMDB genre terminology
-6. Ensure high-quality results by setting appropriate vote count threshold
+1. Only include search parameters for explicitly specified preferences
+2. For unspecified preferences (empty or "Any"), omit those parameters entirely to allow for broader matches
+3. Construct a search query that focuses on specified parameters while remaining flexible about unspecified ones
+4. Set appropriate vote count thresholds based on how specific the search is:
+   - More specific searches (many parameters) = lower threshold
+   - Broader searches (few parameters) = higher threshold to ensure quality
+5. Consider the mood and themes in query construction only if specified
 
 Provide your response in this exact JSON format:
 {
   "searchParameters": {
-    "query": "comprehensive search query incorporating mood and themes",
-    "year": "year or year range if specified",
-    "with_genres": "comma-separated genre ids if specified",
-    "without_genres": "comma-separated genre ids to exclude if relevant",
-    "with_cast": "comma-separated cast names if specified",
-    "with_crew": "comma-separated crew names if mentioned in additional info",
-    "with_companies": "comma-separated company ids if mentioned",
-    "region": "ISO country code if specified",
-    "with_original_language": "ISO language code if relevant",
-    "vote_average_gte": "minimum rating if specified",
-    "vote_count_gte": "minimum vote count to ensure quality results"
+    "query": "search query focusing on specified parameters",
+    // Only include parameters that correspond to specified preferences
+    // Omit any parameter that corresponds to an unspecified preference
   },
-  "understanding": "brief explanation of what the user is looking for, including mood and themes",
+  "understanding": "brief explanation of what the user is looking for, including which aspects are flexible",
   "searchContext": {
-    "moodKeywords": ["list", "of", "mood", "related", "keywords"],
-    "themeKeywords": ["list", "of", "theme", "related", "keywords"],
-    "additionalCriteria": ["list", "of", "other", "important", "criteria"]
+    "moodKeywords": ["relevant", "mood", "keywords"],
+    "themeKeywords": ["relevant", "theme", "keywords"],
+    "additionalCriteria": ["other", "important", "criteria"],
+    "specifiedParameterCount": number
   }
 }`;
 
@@ -103,7 +100,12 @@ Provide your response in this exact JSON format:
 };
 
 export const enrichMovieData = async (movies: any[], originalPreferences: any) => {
-  const prompt = `As a movie expert, analyze these movies against the original user preferences and provide detailed matching analysis.
+  // Count specified parameters for adjusting confidence threshold
+  const specifiedParams = Object.entries(originalPreferences)
+    .filter(([_, value]) => value && value.toString().trim() !== '')
+    .length;
+
+  const prompt = `As a movie expert, analyze these movies against the original user preferences and provide detailed matching analysis. Note that unspecified preferences (empty or "Any") should NOT impact the confidence score - only evaluate based on specified criteria.
 
 Original User Preferences:
 ${JSON.stringify(originalPreferences, null, 2)}
@@ -111,12 +113,17 @@ ${JSON.stringify(originalPreferences, null, 2)}
 Movies to Analyze:
 ${JSON.stringify(movies, null, 2)}
 
+Important:
+- Only evaluate matches against specified preferences
+- Unspecified preferences should not affect the confidence score
+- Scale confidence scores based on how many preferences were specified (${specifiedParams} parameters specified)
+- Consider the context of broader vs. specific searches
+
 For each movie:
-1. Analyze the overview and details to identify themes and moods
-2. Check if the movie truly matches the user's requested mood
-3. Verify if the themes align with user preferences
-4. Validate any additional criteria from otherInfo
-5. Calculate a confidence score (0-100) for how well it matches all criteria
+1. Analyze how well it matches ONLY the specified preferences
+2. Ignore any preferences that were left empty or "Any"
+3. Calculate a confidence score (0-100) considering only specified criteria
+4. Provide clear explanation of matches and mismatches
 
 Return ONLY a JSON array where each object has:
 {
@@ -124,15 +131,13 @@ Return ONLY a JSON array where each object has:
   "themes": ["identified", "themes"],
   "moods": ["identified", "moods"],
   "matchAnalysis": {
-    "moodMatch": true/false,
-    "themeMatch": true/false,
-    "additionalCriteriaMatch": true/false,
-    "confidenceScore": number,
-    "matchExplanation": "brief explanation of why this movie matches or doesn't match"
+    "moodMatch": true/false (only if mood was specified),
+    "themeMatch": true/false (only if themes were specified),
+    "additionalCriteriaMatch": true/false (only if additional criteria were specified),
+    "confidenceScore": number (scaled based on specified parameters),
+    "matchExplanation": "explanation focusing on specified criteria"
   }
-}
-
-Sort the results by confidenceScore in descending order.`;
+}`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -156,24 +161,29 @@ Sort the results by confidenceScore in descending order.`;
     const data = await response.json();
     const enrichedData = JSON.parse(data.choices[0].message.content);
     
-    // Filter out movies with low confidence scores or poor matches
+    // Calculate minimum confidence threshold based on number of specified parameters
+    const baseThreshold = 70;
+    const thresholdAdjustment = Math.max(0, (8 - specifiedParams) * 5); // Adjust threshold based on specified parameters
+    const adjustedThreshold = Math.max(50, baseThreshold - thresholdAdjustment); // Never go below 50
+
+    // Filter movies with adjusted threshold
     const filteredMovies = enrichedData
       .filter((movie: any) => 
-        movie.matchAnalysis.confidenceScore >= 70 &&
-        (movie.matchAnalysis.moodMatch || !originalPreferences.mood) &&
-        (movie.matchAnalysis.themeMatch || !originalPreferences.themes)
+        movie.matchAnalysis.confidenceScore >= adjustedThreshold
       )
       .map((movie: any) => ({
         ...movie,
         themes: movie.themes || [],
         moods: movie.moods || [],
-        matchAnalysis: movie.matchAnalysis || {}
+        matchAnalysis: {
+          ...movie.matchAnalysis,
+          adjustedThreshold // Include the threshold used for transparency
+        }
       }));
 
     return filteredMovies;
   } catch (error: any) {
     console.error("OpenAI API Error:", error);
-    // Return original movies if enrichment fails
     return movies.map(movie => ({
       ...movie,
       themes: [],
