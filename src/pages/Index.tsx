@@ -36,10 +36,20 @@ const Index = () => {
         description: analysis.understanding,
       });
 
-      // Step 2: Search TMDB with the analyzed parameters
-      const movieResults = await searchMovies(analysis.searchParameters);
+      // Step 2: Search TMDB with all provided search parameters
+      const searchPromises = analysis.searchParameters.map(params => 
+        searchMovies(params)
+      );
       
-      if (movieResults.length === 0) {
+      const allMovieResults = await Promise.all(searchPromises);
+      // Combine and deduplicate results
+      const uniqueMovies = Array.from(
+        new Map(
+          allMovieResults.flat().map(movie => [movie.id, movie])
+        ).values()
+      );
+      
+      if (uniqueMovies.length === 0) {
         toast({
           title: "No Results",
           description: "No movies found matching your preferences. Try adjusting your search criteria.",
@@ -50,7 +60,7 @@ const Index = () => {
       }
 
       // Step 3: Enrich movie data with OpenAI
-      const enrichedMovies = await enrichMovieData(movieResults, preferences);
+      const enrichedMovies = await enrichMovieData(uniqueMovies, preferences);
       
       if (enrichedMovies.length === 0) {
         toast({
@@ -66,14 +76,19 @@ const Index = () => {
           .filter(([_, value]) => value && value.toString().trim() !== '')
           .length;
         
-        // Show match quality toast with context about search breadth
-        const matchDescription = specifiedParams <= 3 
+        // Show match quality toast with context
+        const matchDescription = specifiedParams <= 2 
           ? `Found ${enrichedMovies.length} movies matching your broad criteria.`
           : `Found ${enrichedMovies.length} movies that closely match your specific preferences.`;
         
+        // Add country-specific context if relevant
+        const countryContext = preferences.country 
+          ? ` Including matches for both ${preferences.country} productions and ${preferences.country}-language films.`
+          : '';
+        
         toast({
           title: "Matches Found",
-          description: matchDescription,
+          description: matchDescription + countryContext,
         });
       }
       
