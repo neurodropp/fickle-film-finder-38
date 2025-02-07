@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 
 const ITEMS_PER_PAGE = 5;
+const MINIMUM_CONFIDENCE_SCORE = 70; // Only show movies with confidence score >= 70
 
 const Index = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -52,11 +53,38 @@ const Index = () => {
       // Step 3: Enrich movie data with OpenAI
       const enrichedMovies = await enrichMovieData(movieResults, preferences);
       
+      // Filter movies based on confidence score and match criteria
+      const filteredMovies = enrichedMovies.filter(movie => 
+        movie.matchAnalysis && 
+        movie.matchAnalysis.confidenceScore >= MINIMUM_CONFIDENCE_SCORE
+      );
+
+      if (filteredMovies.length === 0) {
+        toast({
+          title: "No Strong Matches",
+          description: "We found some movies, but none matched your criteria closely enough. Try broadening your search.",
+          variant: "destructive",
+        });
+        setMovies([]);
+        return;
+      } else {
+        // Show match quality toast
+        toast({
+          title: "Matches Found",
+          description: `Found ${filteredMovies.length} movies that closely match your preferences.`,
+        });
+      }
+      
       // Update excluded titles for potential "Search Again"
-      const newExcludedTitles = enrichedMovies.map((movie: Movie) => movie.title);
+      const newExcludedTitles = filteredMovies.map((movie: Movie) => movie.title);
       setExcludedTitles(prev => [...prev, ...newExcludedTitles]);
 
-      setMovies(enrichedMovies);
+      // Sort movies by confidence score
+      const sortedMovies = [...filteredMovies].sort((a, b) => 
+        (b.matchAnalysis?.confidenceScore || 0) - (a.matchAnalysis?.confidenceScore || 0)
+      );
+
+      setMovies(sortedMovies);
       setVisibleMovies(ITEMS_PER_PAGE);
 
     } catch (error: any) {
