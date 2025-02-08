@@ -1,4 +1,3 @@
-
 const TMDB_API_KEY = "817893c1d72568bfe2daa1d0e2c525a8";
 const TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MTc4OTNjMWQ3MjU2OGJmZTJkYWExZDBlMmM1MjVhOCIsIm5iZiI6MTczODUxMTQ3MC43MzEsInN1YiI6IjY3OWY5NDZlZjBmOWRiZGJhNjk1NmY0ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Tx-lmCd45D5Sg9INtqsWfGCmwBnFkCadpnWOHEOa760";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -10,15 +9,16 @@ export interface Movie {
   overview: string;
   release_date: string;
   vote_average: number;
+  vote_count: number;
+  popularity: number;
+  original_language: string;
   genres: string[];
+  production_countries: string[];
+  cast: string[];
   media_type?: string;
-  production_countries?: string[];
-  cast?: string[];
-  themes?: string[];
-  moods?: string[];
 }
 
-// Request queue implementation
+// Request queue implementation for rate limiting
 class RequestQueue {
   private queue: (() => Promise<any>)[] = [];
   private processing = false;
@@ -107,7 +107,6 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
     }
   };
 
-  // Use TMDB_BASE_URL constant for constructing URLs
   const [movieDetails, credits] = await Promise.all([
     fetchWithRetry(
       `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}`,
@@ -127,12 +126,13 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
 };
 
 export const searchMovies = async (searchParams: {
-  query: string;
-  year?: string;
-  with_genres?: string;
-  with_cast?: string;
+  query?: string;
+  primary_release_year?: string;
   region?: string;
+  with_original_language?: string;
+  with_genres?: string;
   vote_average_gte?: string;
+  sort_by?: string;
 }): Promise<Movie[]> => {
   const options = {
     headers: {
@@ -141,34 +141,35 @@ export const searchMovies = async (searchParams: {
     }
   };
 
-  let queryParams = new URLSearchParams({
+  const queryParams = new URLSearchParams({
     api_key: TMDB_API_KEY,
-    query: searchParams.query,
     language: 'en-US',
     include_adult: 'false',
-    page: '1'
+    page: '1',
+    sort_by: searchParams.sort_by || 'vote_count.desc,popularity.desc'
   });
 
-  if (searchParams.year) queryParams.append('year', searchParams.year);
-  if (searchParams.with_genres) queryParams.append('with_genres', searchParams.with_genres);
-  if (searchParams.with_cast) queryParams.append('with_cast', searchParams.with_cast);
+  // Add optional parameters
+  if (searchParams.query) queryParams.append('query', searchParams.query);
+  if (searchParams.primary_release_year) queryParams.append('primary_release_year', searchParams.primary_release_year);
   if (searchParams.region) queryParams.append('region', searchParams.region);
+  if (searchParams.with_original_language) queryParams.append('with_original_language', searchParams.with_original_language);
+  if (searchParams.with_genres) queryParams.append('with_genres', searchParams.with_genres);
   if (searchParams.vote_average_gte) queryParams.append('vote_average.gte', searchParams.vote_average_gte);
 
   try {
-    // Use TMDB_BASE_URL constant for constructing URLs
     const response = await fetchWithRetry(
-      `${TMDB_BASE_URL}/search/movie?${queryParams.toString()}`,
+      `${TMDB_BASE_URL}/discover/movie?${queryParams.toString()}`,
       options
     );
     
     const data = await response.json();
     
-    const movies = [];
-    // Limit to first 10 results to reduce API calls
+    // Limit to first 10 results
     const limitedResults = data.results.slice(0, 10);
     
-    // Process movies sequentially to avoid overwhelming the API
+    // Process movies sequentially
+    const movies = [];
     for (const movie of limitedResults) {
       try {
         const details = await fetchMovieDetails(movie.id);
@@ -181,12 +182,13 @@ export const searchMovies = async (searchParams: {
           overview: movie.overview,
           release_date: movie.release_date,
           vote_average: movie.vote_average,
+          vote_count: movie.vote_count,
+          popularity: movie.popularity,
+          original_language: movie.original_language,
           genres: details.genres,
-          media_type: "movie",
           production_countries: details.production_countries,
           cast: details.cast,
-          themes: [], // Will be populated by OpenAI
-          moods: [], // Will be populated by OpenAI
+          media_type: "movie"
         });
       } catch (error) {
         console.error(`Error fetching details for movie ${movie.title}:`, error);

@@ -1,26 +1,33 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
 
 interface SearchFormProps {
-  onSearch: (preferences: any) => void;
+  onSearch: (preferences: SearchFormData) => void;
   isLoading: boolean;
 }
 
+export interface SearchFormData {
+  type: string;
+  years: string;
+  country: string;
+  originalLanguage: string;
+  actors: string;
+  genre: string;
+  rating: string;
+}
+
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
-  const { toast } = useToast();
-  const [preferences, setPreferences] = useState({
+  const [preferences, setPreferences] = useState<SearchFormData>({
     type: "",
-    mood: "",
     years: "",
     country: "",
+    originalLanguage: "",
     actors: "",
     genre: "",
-    themes: "",
     rating: "",
-    otherInfo: "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,18 +51,6 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="mood">Mood</Label>
-          <Input
-            id="mood"
-            placeholder="How do you feel?"
-            value={preferences.mood}
-            onChange={(e) =>
-              setPreferences({ ...preferences, mood: e.target.value })
-            }
-            className="text-gray-800"
-          />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="years">Years</Label>
           <Input
             id="years"
@@ -68,13 +63,25 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="country">Country</Label>
+          <Label htmlFor="country">Production Country</Label>
           <Input
             id="country"
             placeholder="e.g., USA, France"
             value={preferences.country}
             onChange={(e) =>
               setPreferences({ ...preferences, country: e.target.value })
+            }
+            className="text-gray-800"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="originalLanguage">Original Language</Label>
+          <Input
+            id="originalLanguage"
+            placeholder="e.g., English, French"
+            value={preferences.originalLanguage}
+            onChange={(e) =>
+              setPreferences({ ...preferences, originalLanguage: e.target.value })
             }
             className="text-gray-800"
           />
@@ -104,18 +111,6 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="themes">Themes</Label>
-          <Input
-            id="themes"
-            placeholder="e.g., Revenge, Love"
-            value={preferences.themes}
-            onChange={(e) =>
-              setPreferences({ ...preferences, themes: e.target.value })
-            }
-            className="text-gray-800"
-          />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="rating">Rating</Label>
           <Input
             id="rating"
@@ -127,19 +122,6 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
             className="text-gray-800"
           />
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="otherInfo">Other Information</Label>
-        <Input
-          id="otherInfo"
-          placeholder="e.g., Oscar winner, Based on true story"
-          value={preferences.otherInfo}
-          onChange={(e) =>
-            setPreferences({ ...preferences, otherInfo: e.target.value })
-          }
-          className="text-gray-800"
-        />
       </div>
 
       <Button

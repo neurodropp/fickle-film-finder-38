@@ -1,100 +1,69 @@
+
 const OPENAI_API_KEY = "sk-svcacct-XFS3uNgI_fYiLd-r3LsY_CuSGU9LVNk6snehVRqH-odYw8zGTVNWVpXmuX7gSxr9LT3BlbkFJsOB4ZCd8GZFb5sR7cmdfWs-d39Jsjff8wcqVxnHKOaPLXYE-k0FdRxr8A-vesajoQA";
 
 interface SearchParameters {
   query: string;
-  year?: string;
-  with_genres?: string;
-  with_cast?: string;
+  primary_release_year?: string;
   region?: string;
-  vote_average_gte?: string;
-  without_genres?: string;
-  with_crew?: string;
-  with_companies?: string;
   with_original_language?: string;
-  vote_count_gte?: string;
+  with_genres?: string;
+  vote_average_gte?: string;
+  sort_by: string;
 }
 
-export const analyzePreferences = async (
-  preferences: {
-    type: string;
-    mood: string;
-    years: string;
-    country: string;
-    actors: string;
-    genre: string;
-    themes: string;
-    rating: string;
-    otherInfo: string;
-  },
-  excludedTitles: string[] = []
-) => {
-  const prompt = `As a movie expert, analyze these preferences and create optimal search parameters for TMDB API. Generate diverse, culturally-aware search queries that capture the essence of the preferences without being overly literal.
-
-User Preferences:
-Type: ${preferences.type || 'Any'}
-Mood: ${preferences.mood || 'Any'}
-Years: ${preferences.years || 'Any'}
-Country: ${preferences.country || 'Any'}
-Actors: ${preferences.actors || 'Any'}
-Genre: ${preferences.genre || 'Any'}
-Themes: ${preferences.themes || 'Any'}
-Minimum Rating: ${preferences.rating || 'Any'}
-Additional Info: ${preferences.otherInfo || 'None'}
-
-${excludedTitles.length > 0 ? 'Please exclude these titles: ' + excludedTitles.join(', ') : ''}
+export const analyzePreferences = async (preferences: {
+  type: string;
+  years: string;
+  country: string;
+  originalLanguage: string;
+  actors: string;
+  genre: string;
+  rating: string;
+}) => {
+  const prompt = `Convert these search preferences to TMDB API parameters:
+Search Parameters:
+- Type: ${preferences.type || 'Any'}
+- Years: ${preferences.years || 'Any'}
+- Production Country: ${preferences.country || 'Any'}
+- Original Language: ${preferences.originalLanguage || 'Any'}
+- Actors: ${preferences.actors || 'Any'}
+- Genre: ${preferences.genre || 'Any'}
+- Minimum Rating: ${preferences.rating || 'Any'}
 
 Instructions:
-1. For each country, create MULTIPLE search variations that consider:
-   - Cultural-specific terms (e.g., "commedia all'italiana" for Italian comedy)
-   - Popular genres in that country
-   - Famous directors or movements from that country
-   - Both production country AND language
-2. For mood searches:
-   - Transform moods into relevant genre combinations
-   - Include cultural interpretations of the mood
-   - Consider regional variations in genre expectations
-3. Set appropriate vote count thresholds:
-   - For non-English content: minimum 50 votes
-   - For specific searches (3+ parameters): minimum 100 votes
-   - For broader searches (1-2 parameters): minimum 500 votes
-4. Generate culturally relevant search terms:
-   - Map moods to cultural-specific concepts
-   - Include regional film movements or styles
-   - Consider local genre preferences
-5. Create multiple search variations:
-   - Combine different genre pairs
-   - Mix cultural terms with international ones
-   - Include both broad and specific searches
-
-Genre ID Reference:
-- Comedy: 35
-- Drama: 18
-- Romance: 10749
-- Family: 10751
-- Documentary: 99
-- Adventure: 12
-- Animation: 16
+1. Convert country names to ISO codes (e.g., "Italy" → "IT")
+2. Convert language names to ISO codes (e.g., "Italian" → "it")
+3. Map genre names to TMDB genre IDs using this reference:
+   - Action: 28
+   - Adventure: 12
+   - Animation: 16
+   - Comedy: 35
+   - Crime: 80
+   - Documentary: 99
+   - Drama: 18
+   - Family: 10751
+   - Fantasy: 14
+   - Horror: 27
+   - Music: 10402
+   - Mystery: 9648
+   - Romance: 10749
+   - Science Fiction: 878
+   - Thriller: 53
+   - War: 10752
+   - Western: 37
+4. Set sort_by=vote_count.desc,popularity.desc
+5. Return exactly 10 results
 
 Provide your response in this JSON format:
 {
-  "searchParameters": [{
-    "query": "search query with cultural context",
-    "region": "country code if specified",
-    "with_original_language": "language code if specified",
-    "with_genres": "relevant genre IDs",
-    "vote_count_gte": "adjusted threshold",
-    // other relevant parameters
-  }],
-  "understanding": "brief explanation of search approach",
-  "searchContext": {
-    "moodKeywords": ["relevant", "mood", "keywords"],
-    "genreContext": ["relevant", "genres"],
-    "countryContext": {
-      "region": "region code if specified",
-      "language": "language code if specified",
-      "culturalKeywords": ["culturally specific terms"]
-    },
-    "specifiedParameterCount": number
+  "searchParameters": {
+    "query": "actor names if specified",
+    "primary_release_year": "from years field",
+    "region": "country code",
+    "with_original_language": "language code",
+    "with_genres": "comma-separated genre IDs",
+    "vote_average_gte": "minimum rating",
+    "sort_by": "vote_count.desc,popularity.desc"
   }
 }`;
 
@@ -127,105 +96,11 @@ Provide your response in this JSON format:
   }
 };
 
-export const enrichMovieData = async (movies: any[], originalPreferences: any) => {
-  // Count specified parameters
-  const specifiedParams = Object.entries(originalPreferences)
-    .filter(([_, value]) => value && value.toString().trim() !== '')
-    .length;
-
-  const prompt = `As a movie expert, analyze these movies against the original user preferences and provide detailed matching analysis. Consider country matches based on BOTH production country AND original language.
-
-Original User Preferences:
-${JSON.stringify(originalPreferences, null, 2)}
-
-Movies to Analyze:
-${JSON.stringify(movies, null, 2)}
-
-Important Guidelines:
-1. Consider a movie a good country match if it EITHER:
-   - Was produced in the specified country
-   - Is in the specified country's language
-2. For mood matching:
-   - Consider plot, genre, and overall tone
-   - Look for synonyms and related concepts
-3. Adjust confidence scoring:
-   - Base threshold: 60 (not 70 as before)
-   - Country matches: Count as positive if EITHER production or language matches
-   - Mood matches: Consider broader interpretations
-4. Scale confidence scores based on:
-   - Number of specified parameters (${specifiedParams} parameters specified)
-   - Partial matches (especially for country/language)
-
-For each movie, provide:
-1. Detailed analysis of how it matches specified preferences
-2. Confidence score calculation explanation
-3. Clear identification of partial matches
-
-Return a JSON array where each object has:
-{
-  ...original movie data...,
-  "themes": ["identified", "themes"],
-  "moods": ["identified", "moods"],
-  "matchAnalysis": {
-    "countryMatch": {
-      "production": boolean,
-      "language": boolean
-    },
-    "moodMatch": boolean,
-    "confidenceScore": number,
-    "matchExplanation": "detailed explanation"
-  }
-}`;
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || 'Failed to enrich movie data');
+export const enrichMovieData = async (movies: any[]) => {
+  return movies.map(movie => ({
+    ...movie,
+    matchAnalysis: {
+      confidenceScore: 100, // All results are now considered equally relevant
     }
-
-    const data = await response.json();
-    const enrichedData = JSON.parse(data.choices[0].message.content);
-    
-    // Calculate minimum confidence threshold based on number of specified parameters
-    const baseThreshold = 60; // Lowered from 70
-    const thresholdAdjustment = Math.max(0, (8 - specifiedParams) * 7); // Increased adjustment factor
-    const adjustedThreshold = Math.max(40, baseThreshold - thresholdAdjustment); // Lower minimum threshold
-
-    // Filter movies with adjusted threshold
-    const filteredMovies = enrichedData
-      .filter((movie: any) => 
-        movie.matchAnalysis.confidenceScore >= adjustedThreshold
-      )
-      .map((movie: any) => ({
-        ...movie,
-        themes: movie.themes || [],
-        moods: movie.moods || [],
-        matchAnalysis: {
-          ...movie.matchAnalysis,
-          adjustedThreshold
-        }
-      }));
-
-    return filteredMovies;
-  } catch (error: any) {
-    console.error("OpenAI API Error:", error);
-    return movies.map(movie => ({
-      ...movie,
-      themes: [],
-      moods: []
-    }));
-  }
+  }));
 };

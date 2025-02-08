@@ -3,10 +3,12 @@ import { useState } from "react";
 import SearchForm from "@/components/MovieFinder/SearchForm";
 import MovieCard from "@/components/MovieFinder/MovieCard";
 import LoadingSpinner from "@/components/MovieFinder/LoadingSpinner";
+import APIDebugPanel from "@/components/MovieFinder/APIDebugPanel";
 import { analyzePreferences, enrichMovieData } from "@/lib/openai";
 import { searchMovies, type Movie } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import type { SearchFormData } from "@/components/MovieFinder/SearchForm";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -14,42 +16,36 @@ const Index = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [visibleMovies, setVisibleMovies] = useState(ITEMS_PER_PAGE);
-  const [excludedTitles, setExcludedTitles] = useState<string[]>([]);
-  const [lastPreferences, setLastPreferences] = useState<any>(null);
+  const [apiDebugInfo, setApiDebugInfo] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleSearch = async (preferences: any, isNewSearch: boolean = true) => {
+  const handleSearch = async (preferences: SearchFormData) => {
     setIsLoading(true);
     try {
-      if (isNewSearch) {
-        setExcludedTitles([]);
-        setLastPreferences(preferences);
-      }
-
       // Step 1: Analyze preferences using OpenAI
-      const analysis = await analyzePreferences(preferences, excludedTitles);
-      console.log("OpenAI Analysis:", analysis);
-
-      // Show the AI's understanding of the search
-      toast({
-        title: "Search Understanding",
-        description: analysis.understanding,
+      const analysis = await analyzePreferences(preferences);
+      
+      // Step 2: Search TMDB with the analyzed parameters
+      const searchParams = analysis.searchParameters;
+      const movieResults = await searchMovies(searchParams);
+      
+      // Step 3: Enrich movie data
+      const enrichedMovies = await enrichMovieData(movieResults);
+      
+      // Store API debug information
+      setApiDebugInfo({
+        openai: {
+          input: { preferences },
+          output: analysis
+        },
+        tmdb: {
+          searchUrl: 'https://api.themoviedb.org/3/search/movie',
+          searchParams: searchParams,
+          resultsCount: enrichedMovies.length
+        }
       });
 
-      // Step 2: Search TMDB with all provided search parameters
-      const searchPromises = analysis.searchParameters.map(params => 
-        searchMovies(params)
-      );
-      
-      const allMovieResults = await Promise.all(searchPromises);
-      // Combine and deduplicate results
-      const uniqueMovies = Array.from(
-        new Map(
-          allMovieResults.flat().map(movie => [movie.id, movie])
-        ).values()
-      );
-      
-      if (uniqueMovies.length === 0) {
+      if (enrichedMovies.length === 0) {
         toast({
           title: "No Results",
           description: "No movies found matching your preferences. Try adjusting your search criteria.",
@@ -59,46 +55,9 @@ const Index = () => {
         return;
       }
 
-      // Step 3: Enrich movie data with OpenAI
-      const enrichedMovies = await enrichMovieData(uniqueMovies, preferences);
-      
-      if (enrichedMovies.length === 0) {
-        toast({
-          title: "No Strong Matches",
-          description: "We found some movies, but none matched your criteria closely enough. Try broadening your search.",
-          variant: "destructive",
-        });
-        setMovies([]);
-        return;
-      } else {
-        // Count specified parameters
-        const specifiedParams = Object.entries(preferences)
-          .filter(([_, value]) => value && value.toString().trim() !== '')
-          .length;
-        
-        // Show match quality toast with context
-        const matchDescription = specifiedParams <= 2 
-          ? `Found ${enrichedMovies.length} movies matching your broad criteria.`
-          : `Found ${enrichedMovies.length} movies that closely match your specific preferences.`;
-        
-        // Add country-specific context if relevant
-        const countryContext = preferences.country 
-          ? ` Including matches for both ${preferences.country} productions and ${preferences.country}-language films.`
-          : '';
-        
-        toast({
-          title: "Matches Found",
-          description: matchDescription + countryContext,
-        });
-      }
-      
-      // Update excluded titles for potential "Search Again"
-      const newExcludedTitles = enrichedMovies.map((movie: Movie) => movie.title);
-      setExcludedTitles(prev => [...prev, ...newExcludedTitles]);
-
-      // Sort movies by confidence score
+      // Sort movies by vote count and popularity
       const sortedMovies = [...enrichedMovies].sort((a, b) => 
-        (b.matchAnalysis?.confidenceScore || 0) - (a.matchAnalysis?.confidenceScore || 0)
+        (b.vote_count - a.vote_count) || (b.popularity - a.popularity)
       );
 
       setMovies(sortedMovies);
@@ -121,12 +80,6 @@ const Index = () => {
     setVisibleMovies((prev) => Math.min(prev + ITEMS_PER_PAGE, movies.length));
   };
 
-  const handleSearchAgain = () => {
-    if (lastPreferences) {
-      handleSearch(lastPreferences, false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-moviefinder-background text-white p-8">
       <div className="max-w-7xl mx-auto">
@@ -139,12 +92,16 @@ const Index = () => {
           </p>
         </div>
 
-        <SearchForm onSearch={(prefs) => handleSearch(prefs, true)} isLoading={isLoading} />
+        <SearchForm onSearch={handleSearch} isLoading={isLoading} />
 
         {isLoading && (
           <div className="mt-12">
             <LoadingSpinner />
           </div>
+        )}
+
+        {apiDebugInfo && !isLoading && (
+          <APIDebugPanel apiCalls={apiDebugInfo} />
         )}
 
         {movies.length > 0 && !isLoading && (
@@ -155,8 +112,8 @@ const Index = () => {
               ))}
             </div>
             
-            <div className="text-center mt-8 pb-8 space-x-4">
-              {visibleMovies < movies.length && (
+            {visibleMovies < movies.length && (
+              <div className="text-center mt-8">
                 <Button
                   onClick={handleShowMore}
                   variant="outline"
@@ -164,16 +121,8 @@ const Index = () => {
                 >
                   Show More Movies
                 </Button>
-              )}
-              
-              <Button
-                onClick={handleSearchAgain}
-                variant="outline"
-                className="bg-moviefinder-silver text-black hover:bg-moviefinder-gold transition-colors duration-200"
-              >
-                Search Again (Exclude Current Results)
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>

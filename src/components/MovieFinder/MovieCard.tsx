@@ -1,3 +1,4 @@
+
 import { Movie } from "@/lib/tmdb";
 import { useEffect, useState } from "react";
 
@@ -56,36 +57,34 @@ const MovieCard = ({ movie }: MovieCardProps) => {
             >
               {movie.title}
             </a>
-            <span className="text-moviefinder-gold text-lg">★ {movie.vote_average.toFixed(1)}</span>
+            <div className="text-right">
+              <div className="text-moviefinder-gold text-lg">★ {movie.vote_average.toFixed(1)}</div>
+              <div className="text-sm text-moviefinder-silver">
+                {movie.vote_count} votes
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2 text-moviefinder-silver">
             <p className="text-sm">
-              <span className="font-semibold">Type:</span> {movie.media_type === 'tv' ? 'TV Series' : 'Movie'}
-            </p>
-            <p className="text-sm">
-              <span className="font-semibold">Year:</span>{" "}
+              <span className="font-semibold">Release Year:</span>{" "}
               {new Date(movie.release_date).getFullYear()}
             </p>
             <p className="text-sm">
-              <span className="font-semibold">Countries:</span>{" "}
-              {movie.production_countries?.join(", ") || "Loading..."}
+              <span className="font-semibold">Production Countries:</span>{" "}
+              {movie.production_countries?.join(", ") || "Not available"}
+            </p>
+            <p className="text-sm">
+              <span className="font-semibold">Original Language:</span>{" "}
+              {movie.original_language?.toUpperCase() || "Not available"}
             </p>
             <p className="text-sm">
               <span className="font-semibold">Cast:</span>{" "}
-              {movie.cast?.join(", ") || "Loading..."}
+              {movie.cast?.join(", ") || "Not available"}
             </p>
             <p className="text-sm">
               <span className="font-semibold">Genres:</span>{" "}
-              {movie.genres?.join(", ") || "Loading..."}
-            </p>
-            <p className="text-sm">
-              <span className="font-semibold">Themes:</span>{" "}
-              {movie.themes?.join(", ") || "Not available"}
-            </p>
-            <p className="text-sm">
-              <span className="font-semibold">Moods:</span>{" "}
-              {movie.moods?.join(", ") || "Not available"}
+              {movie.genres?.join(", ") || "Not available"}
             </p>
           </div>
 
