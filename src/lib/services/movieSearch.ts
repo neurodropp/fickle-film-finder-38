@@ -4,10 +4,8 @@ import { TMDB_API_KEY, TMDB_BEARER_TOKEN, TMDB_BASE_URL, CACHE_DURATION } from '
 import { fetchWithRetry } from '../utils/fetchWithRetry';
 import { fetchMovieDetails } from './movieDetails';
 
-// Cache implementation for search results
 const searchCache = new Map<string, { data: Movie[]; timestamp: number }>();
 
-// Helper function to generate cache key
 const generateCacheKey = (params: any): string => {
   return JSON.stringify(Object.entries(params).sort());
 };
@@ -15,7 +13,7 @@ const generateCacheKey = (params: any): string => {
 export const searchMovies = async (searchParams: {
   query?: string;
   primary_release_year?: string;
-  with_production_countries?: string;
+  with_origin_country?: string;
   with_original_language?: string;
   with_genres?: string;
   vote_average_gte?: string;
@@ -40,13 +38,13 @@ export const searchMovies = async (searchParams: {
     language: 'en-US',
     include_adult: 'false',
     page: '1',
-    sort_by: searchParams.sort_by || 'vote_count.desc,popularity.desc',
-    'vote_count.gte': '100'
+    sort_by: searchParams.sort_by || 'popularity.desc',
+    'vote_count.gte': '50'
   });
 
   if (searchParams.query) queryParams.append('query', searchParams.query);
   if (searchParams.primary_release_year) queryParams.append('primary_release_year', searchParams.primary_release_year);
-  if (searchParams.with_production_countries) queryParams.append('with_production_countries', searchParams.with_production_countries);
+  if (searchParams.with_origin_country) queryParams.append('with_origin_country', searchParams.with_origin_country);
   if (searchParams.with_original_language) queryParams.append('with_original_language', searchParams.with_original_language);
   if (searchParams.with_genres) queryParams.append('with_genres', searchParams.with_genres);
   if (searchParams.vote_average_gte) queryParams.append('vote_average.gte', searchParams.vote_average_gte);
@@ -58,11 +56,19 @@ export const searchMovies = async (searchParams: {
     );
     
     const data = await response.json();
-    const limitedResults = data.results.slice(0, 10);
+    const limitedResults = data.results.slice(0, 20); // Increased from 10 to get more potential matches
     
     const moviePromises = limitedResults.map(async (movie: any) => {
       try {
         const details = await fetchMovieDetails(movie.id);
+        
+        // Additional filtering for country matches
+        if (searchParams.with_origin_country && 
+            !details.production_countries.some((country: string) => 
+              country.includes(searchParams.with_origin_country as string))) {
+          return null;
+        }
+
         return {
           id: movie.id,
           title: movie.title,
@@ -86,11 +92,21 @@ export const searchMovies = async (searchParams: {
       }
     });
 
-    const movies = (await Promise.all(moviePromises)).filter((movie): movie is Movie => movie !== null);
+    const movies = (await Promise.all(moviePromises))
+      .filter((movie): movie is Movie => 
+        movie !== null && 
+        (!searchParams.with_origin_country || 
+          movie.production_countries.some(country => 
+            country.includes(searchParams.with_origin_country as string))
+        )
+      );
     
-    searchCache.set(cacheKey, { data: movies, timestamp: Date.now() });
+    // Sort by popularity within the filtered results
+    const sortedMovies = movies.sort((a, b) => b.popularity - a.popularity);
     
-    return movies;
+    searchCache.set(cacheKey, { data: sortedMovies, timestamp: Date.now() });
+    
+    return sortedMovies;
   } catch (error) {
     console.error("Error searching movies:", error);
     throw error;
