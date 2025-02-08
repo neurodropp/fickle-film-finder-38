@@ -1,3 +1,4 @@
+
 const TMDB_API_KEY = "817893c1d72568bfe2daa1d0e2c525a8";
 const TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MTc4OTNjMWQ3MjU2OGJmZTJkYWExZDBlMmM1MjVhOCIsIm5iZiI6MTczODUxMTQ3MC43MzEsInN1YiI6IjY3OWY5NDZlZjBmOWRiZGJhNjk1NmY0ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Tx-lmCd45D5Sg9INtqsWfGCmwBnFkCadpnWOHEOa760";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -18,13 +19,17 @@ export interface Movie {
   media_type?: string;
 }
 
-// Request queue implementation for rate limiting
+// Cache implementation for search results
+const searchCache = new Map<string, { data: Movie[]; timestamp: number }>();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+// Optimized request queue with reduced delay
 class RequestQueue {
   private queue: (() => Promise<any>)[] = [];
   private processing = false;
   private activeConnections = 0;
   private readonly MAX_CONNECTIONS = 20;
-  private readonly DELAY_BETWEEN_REQUESTS = 100;
+  private readonly DELAY_BETWEEN_REQUESTS = 50; // Reduced from 100ms to 50ms
 
   async add<T>(request: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -52,8 +57,6 @@ class RequestQueue {
         this.activeConnections++;
         try {
           await request();
-        } catch (error) {
-          console.error('Request failed:', error);
         } finally {
           this.activeConnections--;
           await delay(this.DELAY_BETWEEN_REQUESTS);
@@ -69,7 +72,6 @@ class RequestQueue {
 }
 
 const requestQueue = new RequestQueue();
-
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
@@ -99,6 +101,7 @@ const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): P
   });
 };
 
+// Optimized movie details fetching with append_to_response
 const fetchMovieDetails = async (movieId: number): Promise<any> => {
   const options = {
     headers: {
@@ -107,33 +110,40 @@ const fetchMovieDetails = async (movieId: number): Promise<any> => {
     }
   };
 
-  const [movieDetails, credits] = await Promise.all([
-    fetchWithRetry(
-      `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}`,
-      options
-    ).then(res => res.json()),
-    fetchWithRetry(
-      `${TMDB_BASE_URL}/movie/${movieId}/credits?api_key=${TMDB_API_KEY}`,
-      options
-    ).then(res => res.json())
-  ]);
+  const response = await fetchWithRetry(
+    `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=credits`,
+    options
+  );
+  const data = await response.json();
 
   return {
-    production_countries: movieDetails.production_countries?.map((country: any) => country.name) || [],
-    genres: movieDetails.genres?.map((genre: any) => genre.name) || [],
-    cast: credits.cast?.slice(0, 5).map((actor: any) => actor.name) || []
+    production_countries: data.production_countries?.map((country: any) => country.name) || [],
+    genres: data.genres?.map((genre: any) => genre.name) || [],
+    cast: data.credits?.cast?.slice(0, 5).map((actor: any) => actor.name) || []
   };
+};
+
+// Helper function to generate cache key
+const generateCacheKey = (params: any): string => {
+  return JSON.stringify(Object.entries(params).sort());
 };
 
 export const searchMovies = async (searchParams: {
   query?: string;
   primary_release_year?: string;
-  region?: string;
+  with_production_countries?: string;
   with_original_language?: string;
   with_genres?: string;
   vote_average_gte?: string;
   sort_by?: string;
 }): Promise<Movie[]> => {
+  const cacheKey = generateCacheKey(searchParams);
+  const cachedResult = searchCache.get(cacheKey);
+  
+  if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_DURATION) {
+    return cachedResult.data;
+  }
+
   const options = {
     headers: {
       Authorization: `Bearer ${TMDB_BEARER_TOKEN}`,
@@ -146,13 +156,14 @@ export const searchMovies = async (searchParams: {
     language: 'en-US',
     include_adult: 'false',
     page: '1',
-    sort_by: searchParams.sort_by || 'vote_count.desc,popularity.desc'
+    sort_by: searchParams.sort_by || 'vote_count.desc,popularity.desc',
+    'vote_count.gte': '100' // Minimum vote count for better quality
   });
 
   // Add optional parameters
   if (searchParams.query) queryParams.append('query', searchParams.query);
   if (searchParams.primary_release_year) queryParams.append('primary_release_year', searchParams.primary_release_year);
-  if (searchParams.region) queryParams.append('region', searchParams.region);
+  if (searchParams.with_production_countries) queryParams.append('with_production_countries', searchParams.with_production_countries);
   if (searchParams.with_original_language) queryParams.append('with_original_language', searchParams.with_original_language);
   if (searchParams.with_genres) queryParams.append('with_genres', searchParams.with_genres);
   if (searchParams.vote_average_gte) queryParams.append('vote_average.gte', searchParams.vote_average_gte);
@@ -164,16 +175,13 @@ export const searchMovies = async (searchParams: {
     );
     
     const data = await response.json();
-    
-    // Limit to first 10 results
     const limitedResults = data.results.slice(0, 10);
     
-    // Process movies sequentially
-    const movies = [];
-    for (const movie of limitedResults) {
+    // Process movies in parallel with Promise.all
+    const moviePromises = limitedResults.map(async (movie: any) => {
       try {
         const details = await fetchMovieDetails(movie.id);
-        movies.push({
+        return {
           id: movie.id,
           title: movie.title,
           poster_path: movie.poster_path
@@ -189,12 +197,17 @@ export const searchMovies = async (searchParams: {
           production_countries: details.production_countries,
           cast: details.cast,
           media_type: "movie"
-        });
+        };
       } catch (error) {
         console.error(`Error fetching details for movie ${movie.title}:`, error);
-        continue;
+        return null;
       }
-    }
+    });
+
+    const movies = (await Promise.all(moviePromises)).filter((movie): movie is Movie => movie !== null);
+    
+    // Cache the results
+    searchCache.set(cacheKey, { data: movies, timestamp: Date.now() });
     
     return movies;
   } catch (error) {

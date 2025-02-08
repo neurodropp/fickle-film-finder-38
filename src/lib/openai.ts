@@ -1,10 +1,30 @@
 
 const OPENAI_API_KEY = "sk-svcacct-XFS3uNgI_fYiLd-r3LsY_CuSGU9LVNk6snehVRqH-odYw8zGTVNWVpXmuX7gSxr9LT3BlbkFJsOB4ZCd8GZFb5sR7cmdfWs-d39Jsjff8wcqVxnHKOaPLXYE-k0FdRxr8A-vesajoQA";
 
+// Country code mapping for better search accuracy
+const countryMapping: { [key: string]: string } = {
+  "usa": "US",
+  "united states": "US",
+  "america": "US",
+  "uk": "GB",
+  "united kingdom": "GB",
+  "england": "GB",
+  "france": "FR",
+  "germany": "DE",
+  "italy": "IT",
+  "spain": "ES",
+  "japan": "JP",
+  "korea": "KR",
+  "south korea": "KR",
+  "china": "CN",
+  "india": "IN",
+  // Add more mappings as needed
+};
+
 interface SearchParameters {
   query: string;
   primary_release_year?: string;
-  region?: string;
+  with_production_countries?: string;
   with_original_language?: string;
   with_genres?: string;
   vote_average_gte?: string;
@@ -59,7 +79,7 @@ Provide your response in this JSON format:
   "searchParameters": {
     "query": "actor names if specified",
     "primary_release_year": "from years field",
-    "region": "country code",
+    "with_production_countries": "country code",
     "with_original_language": "language code",
     "with_genres": "comma-separated genre IDs",
     "vote_average_gte": "minimum rating",
@@ -75,7 +95,7 @@ Provide your response in this JSON format:
         Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       }),
@@ -88,6 +108,15 @@ Provide your response in this JSON format:
 
     const data = await response.json();
     const analysis = JSON.parse(data.choices[0].message.content);
+    
+    // Post-process the country code
+    if (analysis.searchParameters.with_production_countries) {
+      const countryLower = preferences.country.toLowerCase();
+      if (countryMapping[countryLower]) {
+        analysis.searchParameters.with_production_countries = countryMapping[countryLower];
+      }
+    }
+
     console.log("OpenAI Analysis:", analysis);
     return analysis;
   } catch (error: any) {
